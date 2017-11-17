@@ -1,10 +1,5 @@
-const signalkSchema = require('@signalk/signalk-schema')
 const Bacon = require('baconjs')
 const debug = require('debug')('signalk-simple-notifications')
-
-const relevantKeys = Object.keys(signalkSchema.metadata)
-  .filter(s => s.indexOf('/vessels/*') >= 0)
-  .map(s => s.replace('/vessels/*', '').replace(/\//g, '.').replace(/RegExp/g, '*').substring(1)).sort()
 
 module.exports = function(app) {
   var plugin = {}
@@ -24,7 +19,7 @@ module.exports = function(app) {
         items: {
           title: "Notifications",
           type: "object",
-          required: ["key"],
+          required: ["key", "name"],
           properties: {
             "enabled": {
               title: "Enabled",
@@ -36,6 +31,12 @@ module.exports = function(app) {
               type: "string",
               default: ""
             },
+            "name": {
+              title: "Name",
+              description: "This will be used in the message of the notification",
+              type: "string",
+              default: ""
+            },
             "thresholds": {
               "type": "array",
               "title": " ",
@@ -43,7 +44,7 @@ module.exports = function(app) {
               "items": {
                 "type": "object",
                 "title": "Alarm",
-                "required": ["state", "test", "value", "message"],
+                "required": ["state", "test", "value"],
                 "properties": {
                   "test": {
                     "id": "test",
@@ -81,14 +82,6 @@ module.exports = function(app) {
                     type: "boolean",
                     default: true
                   },
-                  
-                  "message": {
-                    "id": "message",
-                    "type": "string",
-                    "title": "Message",
-                    "description": "The message to display for the alarm.",
-                    "default": ""
-                  }
                 }
               }
             }
@@ -102,6 +95,7 @@ module.exports = function(app) {
     unsubscribes = (options.paths || []).reduce((acc, {
       key,
       enabled,
+      name,
       thresholds,
     }) => {
       if(enabled) {
@@ -110,7 +104,6 @@ module.exports = function(app) {
 
           if ( alarm.test == 'lessthan' )
           {
-            debug("lessthan")
             return value => value < alarm.value
           }
           else
@@ -121,7 +114,7 @@ module.exports = function(app) {
         acc.push(stream.map(value => {
           return tests.findIndex(test => test(value))
         }).skipDuplicates().onValue(alarmIndex => {
-          sendNotificationUpdate(key, alarmIndex, thresholds)
+          sendNotificationUpdate(key, name, alarmIndex, thresholds)
         }))
       }
       return acc
@@ -134,13 +127,12 @@ module.exports = function(app) {
     unsubscribes = []
   }
 
-  function sendNotificationUpdate(key, alarmIndex, thresholds) {
+  function sendNotificationUpdate(key, name, alarmIndex, thresholds) {
     var value = null
     if(alarmIndex >= 0) {
       const alarm = thresholds[alarmIndex]
       value = {
         state: alarm.state,
-        message: alarm.message || 'something',
         method: [],
         timestamp: (new Date()).toISOString()
       }
@@ -152,12 +144,15 @@ module.exports = function(app) {
       {
         value.method.push("sound")
       }
+      var test = alarm.test == 'lessthan' ? 'less than' : 'more than';
+      value["message"] = `The ${name} is ${test} ${alarm.value}`
     }
     else
     {
       value = {
         state: "normal",
-        timestamp: (new Date()).toISOString()
+        timestamp: (new Date()).toISOString(),
+        message: `The ${name} is normal`
       }
     }
     const delta = {
@@ -186,6 +181,7 @@ const defaultNotification = [
   {
     "enabled": false,
     "key": "environment.depth.belowSurface",
+    "name": "depth",
     "thresholds": [
       {
         "test": "lessthan",
@@ -193,13 +189,13 @@ const defaultNotification = [
         "state": "emergency",
         "visual": true,
         "sound": true,
-        "message": "The depth is below 6 feet"
       }
     ]
   },
   {
     "enabled": false,
     "key": "electrical.batteries.0.voltage",
+    "name": "battery",
     "thresholds": [
       {
         "test": "lessthan",
@@ -207,7 +203,6 @@ const defaultNotification = [
         "state": "alert",
         "visual": true,
         "sound": true,
-        "message": "The battery voltage is below 11.5V"
       },
       {
         "test": "greaterthan",
@@ -215,13 +210,13 @@ const defaultNotification = [
         "state": "alert",
         "visual": true,
         "sound": true,
-        "message": "The battery voltage is above 14.5V"
       }
     ]
   },
   {
     "enabled": false,
     "key": "propulsion.port.temperature",
+    "name": "enging temperature",
     "thresholds": [
       {
         "test": "greaterthan",
@@ -229,7 +224,6 @@ const defaultNotification = [
         "state": "alert",
         "visual": true,
         "sound": true,
-        "message": "The port engine temperatureis greater than 130F"
       }
     ]
   }
