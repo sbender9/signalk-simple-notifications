@@ -19,7 +19,7 @@ module.exports = function(app) {
         items: {
           title: "Notifications",
           type: "object",
-          required: ["key", "name"],
+          required: ["key"],
           properties: {
             "enabled": {
               title: "Enabled",
@@ -31,59 +31,49 @@ module.exports = function(app) {
               type: "string",
               default: ""
             },
+            
             "name": {
               title: "Name",
-              description: "This will be used in the message of the notification",
+              description: "If specified, this will be used in the message of the notification, otherwise the key will be used",
               type: "string",
-              default: ""
             },
-            "thresholds": {
-              "type": "array",
-              "title": " ",
-              "description": "Add one or more alarm ",
-              "items": {
-                "type": "object",
-                "title": "Alarm",
-                "required": ["state", "test", "value"],
-                "properties": {
-                  "test": {
-                    "id": "test",
-                    "type": "string",
-                    "title": "Test",
-                    "description": "The type of comparison",
-                    "name": "test",
-                    "enum": ["lessthan", "greaterthan"]
-                  },
-                  
-                  "value": {
-                    "id": "value",
-                    "type": "number",
-                    "title": "Value",
-                    "description": "The value to alarm on",
-                    "name": "value",
-                  },
 
-                  "state": {
-                    "type": "string",
-                    "title": "Alarm State",
-                    "description": "The alarm state when the value is in this zone.",
-                    "default": "normal",
-                    "enum": ["normal", "alert", "warn", "alarm", "emergency"]
-                  },
+            "highValue": {
+              id: "highValue",
+              type: "number",
+              title: "High Value",
+              description: "If specified, the notification will be raised when th the value goes above this",
+              name: "highValue",
+            },
 
-                  "visual": {
-                    title: "Visual",
-                    type: "boolean",
-                    default: true
-                  },
+            "lowValue": {
+              id: "lowValue",
+              type: "number",
+              title: "Low Value",
+              description: "If specified, the notification will be raised when th the value goes below this",
+              name: "lowValue",
+            },            
+            
+            "state": {
+              type: "string",
+              title: "Alarm State",
+              description: "The alarm state when the value is in this zone.",
+              default: "normal",
+              enum: ["normal", "alert", "warn", "alarm", "emergency"]
+            },
+            
+            "visual": {
+              title: "Visual",
+              type: "boolean",
+              description: "Display a visual indication of the notification",
+              default: true
+            },
                   
-                  "sound": {
-                    title: "Sound",
-                    type: "boolean",
-                    default: true
-                  },
-                }
-              }
+            "sound": {
+              title: "Sound",
+              type: "boolean",
+              description: "Sound an audible indication of the notification",
+              default: true
             }
           }
         }
@@ -96,25 +86,24 @@ module.exports = function(app) {
       key,
       enabled,
       name,
-      thresholds,
+      lowValue,
+      highValue,
+      state,
+      visual,
+      sound
     }) => {
       if(enabled) {
         var stream = app.streambundle.getSelfStream(key)
-        const tests = thresholds.map((alarm, i) => {
-
-          if ( alarm.test == 'lessthan' )
-          {
-            return value => value < alarm.value
-          }
-          else
-          {
-            return value => value > alarm.value
-          }
-        })
         acc.push(stream.map(value => {
-          return tests.findIndex(test => test(value))
-        }).skipDuplicates().onValue(alarmIndex => {
-          sendNotificationUpdate(key, name, alarmIndex, thresholds)
+          if ( typeof lowValue !== 'undefined' && value < lowValue ) {
+            return -1
+          } else if ( typeof highValue !== 'undefined' && value > highValue ) {
+            return 1
+          } else {
+            return 0
+          }
+        }).skipDuplicates().onValue(current => {
+          sendNotificationUpdate(key, current, name, lowValue, highValue, state, visual, sound)
         }))
       }
       return acc
@@ -127,25 +116,25 @@ module.exports = function(app) {
     unsubscribes = []
   }
 
-  function sendNotificationUpdate(key, name, alarmIndex, thresholds) {
+  function sendNotificationUpdate(key, current, name, lowValue, highValue, state, visual, sound ) {
     var value = null
-    if(alarmIndex >= 0) {
-      const alarm = thresholds[alarmIndex]
+    if(current != 0) {
       value = {
-        state: alarm.state,
+        state: state,
         method: [],
         timestamp: (new Date()).toISOString()
       }
-      if ( alarm.visual )
+      if ( visual )
       {
         value.method.push("visual")
       }
-      if ( alarm.sound )
+      if ( sound )
       {
         value.method.push("sound")
       }
-      var test = alarm.test == 'lessthan' ? 'less than' : 'more than';
-      value["message"] = `The ${name} is ${test} ${alarm.value}`
+      var test = current == -1 ? 'less than' : 'more than';
+      var val = current == -1 ? lowValue : highValue
+      value["message"] = `The ${name} is ${test} ${val}`
     }
     else
     {
@@ -182,49 +171,28 @@ const defaultNotification = [
     "enabled": false,
     "key": "environment.depth.belowSurface",
     "name": "depth",
-    "thresholds": [
-      {
-        "test": "lessthan",
-        "value": 1.8288,
-        "state": "emergency",
-        "visual": true,
-        "sound": true,
-      }
-    ]
+    "lowValue": 1.8288,
+    "state": "emergency",
+    "visual": true,
+    "sound": true
   },
   {
     "enabled": false,
     "key": "electrical.batteries.0.voltage",
-    "name": "battery",
-    "thresholds": [
-      {
-        "test": "lessthan",
-        "value": 11.5,
-        "state": "alert",
-        "visual": true,
-        "sound": true,
-      },
-      {
-        "test": "greaterthan",
-        "value": 14.5,
-        "state": "alert",
-        "visual": true,
-        "sound": true,
-      }
-    ]
+    "name": "battery voltage",
+    "lowValue": 11.5,
+    "highValue": 14.5,
+    "state": "alert",
+    "visual": true,
+    "sound": true,
   },
   {
     "enabled": false,
     "key": "propulsion.port.temperature",
     "name": "enging temperature",
-    "thresholds": [
-      {
-        "test": "greaterthan",
-        "value": 327.594,
-        "state": "alert",
-        "visual": true,
-        "sound": true,
-      }
-    ]
+    "highValue": 327.594,
+    "state": "alert",
+    "visual": true,
+    "sound": true
   }
 ]
