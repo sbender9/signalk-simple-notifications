@@ -1,6 +1,6 @@
 {
   "name": "signalk-simple-notifications",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Signal K server plugin to setup and send notifications based on simple thresholds",
   "main": "index.js",
   "scripts": {
@@ -13,6 +13,7 @@
   "license": "ISC",
   "dependencies": {
     "baconjs": "^0.7.88",
-    "debug": "^3.1.0"
+    "debug": "^3.1.0",
+    "lodash": "^4.17.4"
   }
 }

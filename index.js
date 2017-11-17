@@ -1,5 +1,6 @@
 const Bacon = require('baconjs')
 const debug = require('debug')('signalk-simple-notifications')
+const _ = require('lodash')
 
 module.exports = function(app) {
   var plugin = {}
@@ -34,7 +35,7 @@ module.exports = function(app) {
             
             "name": {
               title: "Name",
-              description: "If specified, this will be used in the message of the notification, otherwise the key will be used",
+              description: "If specified, this will be used in the message of the notification, otherwise the displayName or key will be used",
               type: "string",
             },
 
@@ -124,20 +125,22 @@ module.exports = function(app) {
         method: [],
         timestamp: (new Date()).toISOString()
       }
-      if ( visual )
-      {
+      if ( visual ) {
         value.method.push("visual")
       }
-      if ( sound )
-      {
+      if ( sound ) {
         value.method.push("sound")
       }
       var test = current == -1 ? 'less than' : 'more than';
       var val = current == -1 ? lowValue : highValue
+      if ( typeof name === 'undefined' ) {
+        name = _.get(app.signalk.self, key + ".meta.displayName")
+        if ( !name ) {
+          name = key;
+        }
+      }
       value["message"] = `The ${name} is ${test} ${val}`
-    }
-    else
-    {
+    } else {
       value = {
         state: "normal",
         timestamp: (new Date()).toISOString(),
