@@ -1,5 +1,4 @@
 const Bacon = require('baconjs')
-const debug = require('debug')('signalk-simple-notifications')
 const _ = require('lodash')
 
 module.exports = function(app) {
@@ -119,6 +118,13 @@ module.exports = function(app) {
 
   function sendNotificationUpdate(key, current, name, lowValue, highValue, state, visual, sound ) {
     var value = null
+    if ( typeof name === 'undefined' ) {
+      name = app.getSelfPath(key + ".meta.displayName")
+      if ( !name ) {
+        name = key;
+      }
+    }
+
     if(current != 0) {
       value = {
         state: state,
@@ -133,12 +139,6 @@ module.exports = function(app) {
       }
       var test = current == -1 ? 'less than' : 'more than';
       var val = current == -1 ? lowValue : highValue
-      if ( typeof name === 'undefined' ) {
-        name = _.get(app.signalk.self, key + ".meta.displayName")
-        if ( !name ) {
-          name = key;
-        }
-      }
       value["message"] = `The ${name} is ${test} ${val}`
     } else {
       value = {
@@ -161,7 +161,7 @@ module.exports = function(app) {
         }
       ]
     }
-    debug("delta: " + JSON.stringify(delta))
+    app.debug("delta: " + JSON.stringify(delta))
     app.signalk.addDelta(delta)
   }
 
