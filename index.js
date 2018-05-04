@@ -162,7 +162,7 @@ module.exports = function(app) {
       ]
     }
     app.debug("delta: " + JSON.stringify(delta))
-    app.signalk.addDelta(delta)
+    app.handleMessage(plugin.id, delta)
   }
 
   return plugin
