@@ -93,6 +93,7 @@ module.exports = function(app) {
       sound
     }) => {
       if(enabled) {
+        app.debug(`subscribing to ${key}`)
         var stream = app.streambundle.getSelfStream(key)
         acc.push(stream.map(value => {
           if ( typeof lowValue !== 'undefined' && value < lowValue ) {
@@ -139,7 +140,13 @@ module.exports = function(app) {
       }
       var test = current == -1 ? 'less than' : 'more than';
       var val = current == -1 ? lowValue : highValue
-      value["message"] = `The ${name} is ${test} ${val}`
+      var units = app.getSelfPath(`${key}.meta.units`)
+      if ( units ) {
+        units = ` (${units})`
+      } else {
+        units = ''
+      }
+      value["message"] = `The ${name} is ${test} ${val.toFixed(2)}${units}`
     } else {
       value = {
         state: "normal",
@@ -151,9 +158,6 @@ module.exports = function(app) {
       context: "vessels." + app.selfId,
       updates: [
         {
-          source: {
-            label: "self.notificationhandler"
-          },
           values: [{
             path: "notifications." + key,
             value: value
